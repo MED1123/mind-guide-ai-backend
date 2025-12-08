@@ -15,26 +15,43 @@ def get_db():
     finally:
         db.close()
 
-# Dodawanie wpisu dla konkretnego użytkownika (uproszczone)
+# Dodawanie wpisu
 @router.post("/{user_id}", response_model=schemas.MoodEntry)
 def create_entry_for_user(
     user_id: int, 
     entry: schemas.MoodEntryCreate, 
     db: Session = Depends(get_db)
 ):
-    # Tworzymy model bazy danych z danych Pydantic
-    # image_paths na razie pomijamy lub konwertujemy na string, jeśli baza tego wymaga
+    # Konwersja listy zdjęć na string (np. "img1.jpg|img2.jpg")
+    # Dzięki temu zapiszemy to w jednej kolumnie w bazie
+    images_str = "|".join(entry.image_paths) if entry.image_paths else ""
+
     db_entry = models.MoodEntry(
-        **entry.dict(exclude={"image_paths"}), 
+        text=entry.text,
+        mood_rating=entry.mood_rating,
+        category=entry.category,
+        image_paths=images_str, 
         owner_id=user_id
     )
     db.add(db_entry)
     db.commit()
     db.refresh(db_entry)
+    
+    # Ważne: Przed zwróceniem odpowiedzi musimy "oszukać" Pydantic
+    # i przypisać z powrotem listę, bo tego oczekuje aplikacja
+    db_entry.image_paths = entry.image_paths
     return db_entry
 
-# Pobieranie wszystkich wpisów
+# Pobieranie wpisów
 @router.get("/", response_model=List[schemas.MoodEntry])
 def read_entries(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     entries = db.query(models.MoodEntry).offset(skip).limit(limit).all()
+    
+    # Konwersja stringa z bazy z powrotem na listę dla każdego wpisu
+    for entry in entries:
+        if entry.image_paths:
+            entry.image_paths = entry.image_paths.split("|")
+        else:
+            entry.image_paths = []
+            
     return entries
