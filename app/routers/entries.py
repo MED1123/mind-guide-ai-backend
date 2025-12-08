@@ -42,12 +42,17 @@ def create_entry_for_user(
     db_entry.image_paths = entry.image_paths
     return db_entry
 
-# Pobieranie wpisów
-@router.get("/", response_model=List[schemas.MoodEntry])
-def read_entries(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    entries = db.query(models.MoodEntry).offset(skip).limit(limit).all()
+@router.get("/{user_id}", response_model=List[schemas.MoodEntry])
+def read_entries(user_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    # Filtrujemy po owner_id == user_id
+    entries = db.query(models.MoodEntry)\
+        .filter(models.MoodEntry.owner_id == user_id)\
+        .order_by(models.MoodEntry.date.desc())\
+        .offset(skip)\
+        .limit(limit)\
+        .all()
     
-    # Konwersja stringa z bazy z powrotem na listę dla każdego wpisu
+    # Konwersja stringa z bazy z powrotem na listę
     for entry in entries:
         if entry.image_paths:
             entry.image_paths = entry.image_paths.split("|")
