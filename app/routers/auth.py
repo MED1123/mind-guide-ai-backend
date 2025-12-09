@@ -27,13 +27,17 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     
     hashed_password = pwd_context.hash(user.password)
     
-    new_user = models.User(email=user.email, hashed_password=hashed_password)
+    new_user = models.User(
+        email=user.email, 
+        username=user.username, # <--- ZAPISUJEMY USERNAME
+        hashed_password=hashed_password
+    )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
     return new_user
 
-# --- LOGOWANIE (TEGO BRAKOWAŁO) ---
+# --- LOGOWANIE ---
 class LoginResponse(BaseModel):
     user_id: int
     email: str
@@ -41,6 +45,10 @@ class LoginResponse(BaseModel):
 
 @router.post("/login", response_model=LoginResponse)
 def login_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    # Uwaga: Schemat UserCreate wymaga teraz username, ale przy logowaniu
+    # Flutter może wysłać pusty ciąg lub cokolwiek w polu username,
+    # ponieważ tutaj sprawdzamy tylko email i hasło.
+    
     # 1. Szukamy użytkownika
     db_user = db.query(models.User).filter(models.User.email == user.email).first()
     if not db_user:

@@ -10,6 +10,12 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
     is_active = Column(Boolean, default=True)
+
+    name = Column(String, default="")
+    surname = Column(String, default="")
+    username = Column(String, default="")
+    birth_date = Column(String, default="")
+    profile_image_path = Column(String, default="")
     
     # Relacja: Jeden użytkownik ma wiele wpisów
     entries = relationship("MoodEntry", back_populates="owner")
