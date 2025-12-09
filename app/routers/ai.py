@@ -11,7 +11,6 @@ router = APIRouter(
     tags=["ai"]
 )
 
-# Modele danych dla requestów
 class AnalysisRequest(BaseModel):
     text: str
     previous_context: str = ""
@@ -27,7 +26,6 @@ def get_db():
     finally:
         db.close()
 
-# --- 1. Analiza pojedynczego wpisu ---
 @router.post("/analyze_mood")
 async def analyze_mood(request: AnalysisRequest):
     simulated_response = (
@@ -37,7 +35,7 @@ async def analyze_mood(request: AnalysisRequest):
     )
     return {"analysis": simulated_response}
 
-# --- 2. Analiza tygodniowa (TEN ENDPOINT JEST KLUCZOWY) ---
+# --- ANALIZA TYGODNIOWA (ZMODYFIKOWANA) ---
 @router.post("/weekly_summary/{user_id}")
 async def analyze_weekly_summary(
     user_id: int, 
@@ -47,7 +45,7 @@ async def analyze_weekly_summary(
     # Domyślnie ostatnie 7 dni
     if date_range is None or not date_range.end_date:
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=7)
+        start_date = end_date - timedelta(days=6) # 7 dni wliczając dzisiaj
     else:
         start_date = date_range.start_date
         end_date = date_range.end_date
@@ -61,33 +59,50 @@ async def analyze_weekly_summary(
         )
     ).all()
 
-    # Jeśli brak wpisów
-    if not entries:
-        return {
-            "entry_count": 0,
-            "average_mood_rating": 0.0,
-            "mood_stats": {},
-            "ai_suggestion": "Brak danych z tego okresu. Dodaj więcej wpisów!"
-        }
+    # --- NOWA LOGIKA: DZIENNY ROZKŁAD WPISÓW ---
+    # Inicjalizujemy mapę zerami dla każdego dnia w zakresie
+    daily_counts: Dict[str, int] = {}
+    delta = (end_date - start_date).days + 1
+    
+    # Tworzymy klucze dat (np. "2023-12-01") dla całego zakresu
+    for i in range(delta):
+        day = start_date + timedelta(days=i)
+        key = day.strftime('%Y-%m-%d')
+        daily_counts[key] = 0
 
-    # Statystyka
+    # Statystyka Nastrojów
     stats: Dict[str, int] = {}
     mood_rating_sum = 0.0
     
     for entry in entries:
+        # 1. Zliczanie nastrojów
         cat = entry.category
         stats[cat] = stats.get(cat, 0) + 1
         mood_rating_sum += entry.mood_rating
+        
+        # 2. Zliczanie dzienne (Wykres Czas - Ilość)
+        entry_day_key = entry.date.strftime('%Y-%m-%d')
+        if entry_day_key in daily_counts:
+            daily_counts[entry_day_key] += 1
 
     average_mood = mood_rating_sum / len(entries) if entries else 0
     
     # Symulacja porady AI
-    summary_text = ", ".join([f"{count}x {mood}" for mood, count in stats.items()])
-    ai_advice = (
-        f"W tym okresie dominowały: {summary_text}. "
-        f"Średnia nastroju: {round(average_mood, 1)}/5.0. "
-        "Wygląda na to, że masz zróżnicowany czas. Pamiętaj o odpoczynku!"
-    )
+    if not entries:
+        ai_advice = "Brak danych z tego okresu. Dodaj wpisy, abym mógł przygotować wykres i analizę."
+    else:
+        summary_text = ", ".join([f"{count}x {mood}" for mood, count in stats.items()])
+        trend = "stabilny"
+        if average_mood > 4.0: trend = "bardzo pozytywny"
+        elif average_mood < 2.5: trend = "wymagający uwagi"
+        
+        ai_advice = (
+            f"W tym okresie Twój nastrój był {trend}. "
+            f"Dominowały: {summary_text}. "
+            f"Średnia ocena: {round(average_mood, 1)}/5.0. "
+            "Na podstawie wykresu widzę, że byłeś aktywny. "
+            "Jeśli czujesz zmęczenie, pamiętaj o regeneracji w weekend."
+        )
 
     return {
         "period": {
@@ -97,5 +112,6 @@ async def analyze_weekly_summary(
         "entry_count": len(entries),
         "average_mood_rating": round(average_mood, 2),
         "mood_stats": stats,
+        "daily_counts": daily_counts, # <--- TO JEST NOWE DLA WYKRESU
         "ai_suggestion": ai_advice
     }
