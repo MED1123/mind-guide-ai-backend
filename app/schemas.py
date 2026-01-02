@@ -42,6 +42,7 @@ class UserUpdate(BaseModel):
     birth_date: Optional[str] = None
     email: Optional[str] = None
     profile_image_path: Optional[str] = None
+    is_dark_mode: Optional[bool] = None
     password: Optional[str] = None
 
 # Tutaj dodaliśmy brakujące pola, żeby API je zwracało po rejestracji
@@ -54,6 +55,7 @@ class User(BaseModel):
     username: str = ""
     birth_date: str = ""
     profile_image_path: str = ""
+    is_dark_mode: bool = False
     entries: List[MoodEntry] = []
 
     class Config:

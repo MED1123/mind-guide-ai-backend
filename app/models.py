@@ -16,6 +16,7 @@ class User(Base):
     username = Column(String, default="")
     birth_date = Column(String, default="")
     profile_image_path = Column(String, default="")
+    is_dark_mode = Column(Boolean, default=False)
     
     # Relacja: Jeden użytkownik ma wiele wpisów
     entries = relationship("MoodEntry", back_populates="owner")
@@ -46,4 +47,14 @@ class AiAnalysisCache(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     range_type = Column(String) # Dzień, Tydzień, Miesiąc, Rok
     ai_suggestion = Column(String)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class SobrietyClock(Base):
+    __tablename__ = "sobriety_clocks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    addiction_type = Column(String) # Alcohol, Smoking, etc.
+    custom_name = Column(String, default="")
+    start_date = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -6,7 +6,7 @@ import os
 load_dotenv()
 
 from app import models, database
-from app.routers import auth, entries, ai, users 
+from app.routers import auth, entries, ai, users, sobriety
 
 models.Base.metadata.create_all(bind=database.engine)
 
@@ -27,6 +27,7 @@ app.include_router(entries.router)
 app.include_router(ai.router)
 # Rejestracja nowego routera
 app.include_router(users.router)
+app.include_router(sobriety.router)
 
 @app.get("/")
 def read_root():

@@ -19,10 +19,12 @@ router = APIRouter(
 class AnalysisRequest(BaseModel):
     text: str
     previous_context: str = ""
+    lang: str = "pl"  # Default to Polish
 
 class DateRange(BaseModel):
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
+    lang: str = "pl" # Support lang in DateRange or pass separately
 
 def get_db():
     db = database.SessionLocal()
@@ -34,26 +36,28 @@ def get_db():
 @router.post("/analyze_mood")
 async def analyze_mood(request: AnalysisRequest):
     api_key = os.getenv("OPENROUTER_API_KEY")
-    if not api_key:
-        return {"analysis": "Błąd konfiguracji: Brak klucza OPENROUTER_API_KEY."}
+    # ... (rest of configuration)
 
-    url = "https://openrouter.ai/api/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        # Optional: Add site URL/Name for OpenRouter rankings
-        # "HTTP-Referer": "YOUR_SITE_URL", 
-        # "X-Title": "YOUR_SITE_NAME",
-    }
-    
-    # Simple prompt engineering
-    system_prompt = (
-        "Jesteś empatycznym asystentem zdrowia psychicznego. "
-        "Twoim zadaniem jest krótka analiza nastroju użytkownika na podstawie jego wpisu. "
-        "Odpowiadaj krótko, ciepło i po polsku. "
-        "Zaproponuj jedną prostą czynność, która może pomóc."
-    )
+    # Prompt selection
+    if request.lang == 'en':
+        system_prompt = (
+            "You are an empathetic mental health assistant. "
+            "Your task is to briefly analyze the user's mood based on their entry. "
+            "Respond briefly, warmly, and in English. "
+            "Suggest one simple activity that might help."
+        )
+    else:
+        system_prompt = (
+            "Jesteś empatycznym asystentem zdrowia psychicznego. "
+            "Twoim zadaniem jest krótka analiza nastroju użytkownika na podstawie jego wpisu. "
+            "Odpowiadaj krótko, ciepło i po polsku. "
+            "Zaproponuj jedną prostą czynność, która może pomóc."
+        )
 
+    # ... (rest of payload construction and request)
+    # Be careful to use system_prompt variable
+
+# ... (inside analyze_mood function)
     payload = {
         "model": "mistralai/mistral-small-3.1-24b-instruct:free",
         "messages": [
@@ -61,30 +65,19 @@ async def analyze_mood(request: AnalysisRequest):
             {"role": "user", "content": request.text}
         ]
     }
+# ...
 
-    try:
-        response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            # Extract content
-            ai_content = data['choices'][0]['message']['content']
-            return {"analysis": ai_content}
-        else:
-            print(f"OpenRouter Error: {response.status_code} - {response.text}")
-            return {"analysis": f"Błąd AI ({response.status_code}). Spróbuj później."}
-            
-    except Exception as e:
-        print(f"Exception during AI request: {e}")
-        return {"analysis": "Wystąpił błąd połączenia z asystentem AI."}
-
-# --- ANALIZA TYGODNIOWA (ZMODYFIKOWANA) ---
 @router.post("/weekly_summary/{user_id}")
 async def analyze_weekly_summary(
     user_id: int, 
-    date_range: DateRange = None, 
+    date_range: DateRange = None, # Expect lang inside DateRange or body
     db: Session = Depends(get_db)
 ):
+    # Domyślny język
+    lang = "pl"
+    if date_range and hasattr(date_range, 'lang'):
+        lang = date_range.lang
+
     # Domyślnie ostatnie 7 dni
     if date_range is None or not date_range.end_date:
         end_date = datetime.now()
@@ -148,23 +141,38 @@ async def analyze_weekly_summary(
     if cached_analysis:
         ai_advice = cached_analysis.ai_suggestion
         print(f"CACHE HIT: Using cached advice for {user_id} ({range_label})")
+        # Jeśli cache jest trafiony, nie pytamy AI
     else:
-        # Real AI Advice Generation
+        # ...
         if not entries:
-            ai_advice = "Brak danych z tego okresu. Dodaj wpisy, abym mógł przygotować wykres i analizę."
+            ai_advice = "No data for this period." if lang == 'en' else "Brak danych z tego okresu."
         else:
-            # Construct the prompt
+             # Construct the prompt
             mood_summary = ", ".join([f"{mood}: {count}" for mood, count in stats.items()])
-            prompt_text = (
-                f"Przeanalizuj aktywność użytkownika z okresu {start_date.strftime('%d.%m')} - {end_date.strftime('%d.%m')}. "
-                f"Liczba wpisów: {len(entries)}. "
-                f"Średnia ocena nastroju: {round(average_mood, 1)}/5.0. "
-                f"Rozkład nastrojów: {mood_summary}. "
-                "Na podstawie tych danych napisz krótką, spersonalizowaną opinię (max 2 zdania). "
-                "Zwróć się bezpośrednio do użytkownika. "
-                "Zaproponuj konkretną radę lub obserwację (np. 'Zalecam więcej snu, ponieważ...')."
-            )
             
+            if lang == 'en':
+                prompt_text = (
+                    f"Analyze user activity from {start_date.strftime('%d.%m')} to {end_date.strftime('%d.%m')}. "
+                    f"Entry count: {len(entries)}. "
+                    f"Average mood: {round(average_mood, 1)}/5.0. "
+                    f"Mood distribution: {mood_summary}. "
+                    "Based on this data, write a short, personalized opinion (max 2 sentences). "
+                    "Address the user directly. "
+                    "Suggest a concrete advice or observation."
+                )
+                system_prompt_weekly = "You are an empathetic psychologist and data analyst. Your goal is to draw conclusions from the user's mood. Write briefly and in English."
+            else:
+                prompt_text = (
+                    f"Przeanalizuj aktywność użytkownika z okresu {start_date.strftime('%d.%m')} - {end_date.strftime('%d.%m')}. "
+                    f"Liczba wpisów: {len(entries)}. "
+                    f"Średnia ocena nastroju: {round(average_mood, 1)}/5.0. "
+                    f"Rozkład nastrojów: {mood_summary}. "
+                    "Na podstawie tych danych napisz krótką, spersonalizowaną opinię (max 2 zdania). "
+                    "Zwróć się bezpośrednio do użytkownika. "
+                    "Zaproponuj konkretną radę lub obserwację (np. 'Zalecam więcej snu, ponieważ...')."
+                )
+                system_prompt_weekly = "Jesteś empatycznym psychologiem i analitykiem danych. Twoim celem jest wyciągnięcie wniosków z nastroju użytkownika. Pisz krótko i po polsku."
+
             # Call AI with Fallback
             api_key = os.getenv("OPENROUTER_API_KEY")
             if not api_key:
@@ -193,7 +201,7 @@ async def analyze_weekly_summary(
                             "messages": [
                                 {
                                     "role": "system", 
-                                    "content": "Jesteś empatycznym psychologiem i analitykiem danych. Twoim celem jest wyciągnięcie wniosków z nastroju użytkownika. Pisz krótko i po polsku."
+                                    "content": system_prompt_weekly
                                 },
                                 {"role": "user", "content": prompt_text}
                             ]

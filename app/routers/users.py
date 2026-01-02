@@ -42,9 +42,14 @@ def update_user_profile(user_id: int, user_update: schemas.UserUpdate, db: Sessi
     if user_update.email is not None:
         db_user.email = user_update.email
     
-    # Obsługa zdjęcia profilowego (nadpisujemy stare nowym stringiem)
+    # Obsługa zdjęcia profilowego
     if user_update.profile_image_path is not None:
         db_user.profile_image_path = user_update.profile_image_path
+
+    # Obsługa trybu ciemnego
+    if user_update.is_dark_mode is not None:
+        print(f"Updating dark mode to: {user_update.is_dark_mode}")
+        db_user.is_dark_mode = user_update.is_dark_mode
 
     # Obsługa zmiany hasła
     if user_update.password:
@@ -53,3 +58,15 @@ def update_user_profile(user_id: int, user_update: schemas.UserUpdate, db: Sessi
     db.commit()
     db.refresh(db_user)
     return db_user
+
+@router.delete("/{user_id}", status_code=204)
+def delete_user_account(user_id: int, db: Session = Depends(get_db)):
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Usuwamy użytkownika (kaskada usunie powiązane wpisy, jeśli tak skonfigurowano bazę,
+    # w przeciwnym razie trzeba ręcznie usunąć wpisy z moods/sobriety)
+    db.delete(db_user)
+    db.commit()
+    return
