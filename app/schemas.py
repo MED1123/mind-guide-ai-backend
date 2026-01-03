@@ -1,6 +1,7 @@
 from pydantic import BaseModel, field_validator
 from typing import List, Optional
 from datetime import datetime
+import uuid
 
 # --- MOOD ENTRY SCHEMAS ---
 
@@ -10,13 +11,17 @@ class MoodEntryCreate(BaseModel):
     category: str
     image_paths: List[str] = []
     date: Optional[datetime] = None
+    conversation: Optional[str] = ""
+    ai_analysis: Optional[str] = ""
 
 class MoodEntry(MoodEntryCreate):
-    id: int
+    id: int # MoodEntry ID remains int in DB for now (unless we migrated it too, but SQL script didn't invalid it)
+            # Actually, the SQL script didn't change mood_entries.id type, only added user_id. 
+            # Ideally keys should be consistent, but let's respect existing DB structure for now.
     date: datetime
     ai_analysis: str = ""
     conversation: str = ""
-    owner_id: int
+    owner_id: uuid.UUID # Changed to UUID
 
     class Config:
         from_attributes = True
@@ -43,19 +48,23 @@ class UserUpdate(BaseModel):
     email: Optional[str] = None
     profile_image_path: Optional[str] = None
     is_dark_mode: Optional[bool] = None
-    password: Optional[str] = None
+    custom_assistant_name: Optional[str] = None # Added field
+    password: Optional[str] = None # Used for password change manually if custom auth
+    old_password: Optional[str] = None
 
-# Tutaj dodaliśmy brakujące pola, żeby API je zwracało po rejestracji
 class User(BaseModel):
-    id: int
+    id: uuid.UUID
     email: str
+    username: Optional[str] = None
     is_active: bool
+    is_verified: bool = False
     name: str = ""
     surname: str = ""
     username: str = ""
     birth_date: str = ""
     profile_image_path: str = ""
     is_dark_mode: bool = False
+    custom_assistant_name: str = "" # Added field
     entries: List[MoodEntry] = []
 
     class Config:

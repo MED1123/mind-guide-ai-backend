@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from typing import List, Optional
 from datetime import datetime
+from uuid import UUID
 from pydantic import BaseModel
 from .. import models, database
 
@@ -12,7 +13,7 @@ router = APIRouter(
 )
 
 class SobrietyClockCreate(BaseModel):
-    user_id: int
+    user_id: str
     addiction_type: str
     custom_name: Optional[str] = ""
     start_date: datetime
@@ -22,7 +23,7 @@ class SobrietyClockReset(BaseModel):
 
 class SobrietyClockResponse(BaseModel):
     id: int
-    user_id: int
+    user_id: UUID
     addiction_type: str
     custom_name: str
     start_date: datetime
@@ -52,7 +53,7 @@ def create_clock(clock: SobrietyClockCreate, db: Session = Depends(get_db)):
     return db_clock
 
 @router.get("/clocks/{user_id}", response_model=List[SobrietyClockResponse])
-def get_user_clocks(user_id: int, db: Session = Depends(get_db)):
+def get_user_clocks(user_id: str, db: Session = Depends(get_db)):
     clocks = db.query(models.SobrietyClock)\
         .filter(models.SobrietyClock.user_id == user_id)\
         .order_by(desc(models.SobrietyClock.created_at))\

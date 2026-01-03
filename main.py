@@ -8,6 +8,12 @@ load_dotenv()
 from app import models, database
 from app.routers import auth, entries, ai, users, sobriety
 
+# import add_email_columns # Auto-run migration
+# add_email_columns.migrate()
+
+# import add_reset_token
+# add_reset_token.migrate()
+
 models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI()

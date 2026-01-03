@@ -69,7 +69,7 @@ async def analyze_mood(request: AnalysisRequest):
 
 @router.post("/weekly_summary/{user_id}")
 async def analyze_weekly_summary(
-    user_id: int, 
+    user_id: str, 
     date_range: DateRange = None, # Expect lang inside DateRange or body
     db: Session = Depends(get_db)
 ):
